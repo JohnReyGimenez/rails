@@ -28,8 +28,20 @@ module ActiveRecord
       # casting behavior, see the types under ActiveModel::Type.)
       def read_attribute(attr_name, &block)
         name = attr_name.to_s
-        name = self.class.attribute_aliases[name] || name
 
+        if self.class.respond_to?(:stored_attributes) && !self.class.stored_attributes.empty?
+          self.class.stored_attributes.each do |store_column_name, keys_array|
+            if keys_array.include?(name.to_sym)
+              if block
+                return read_store_attribute(store_column_name, name.to_sym, &block)
+              else
+                return read_store_attribute(store_column_name, name.to_sym)
+              end
+            end
+          end
+        end
+
+        name = self.class.attribute_aliases[name] || name
         @attributes.fetch_value(name, &block)
       end
 

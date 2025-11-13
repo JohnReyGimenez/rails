@@ -30,8 +30,17 @@ module ActiveRecord
       # +value+. The attribute value will be type cast upon being read.
       def write_attribute(attr_name, value)
         name = attr_name.to_s
-        name = self.class.attribute_aliases[name] || name
 
+        if self.class.respond_to?(:stored_attributes) && !self.class.stored_attributes.empty?
+          self.class.stored_attributes.each do |store_column_name, keys_array|
+            if keys_array.include?(name.to_sym)
+              write_store_attribute(store_column_name, name.to_sym, value)
+              return value
+            end
+          end
+        end
+
+        name = self.class.attribute_aliases[name] || name
         name = @primary_key if name == "id" && @primary_key
         @attributes.write_from_user(name, value)
       end

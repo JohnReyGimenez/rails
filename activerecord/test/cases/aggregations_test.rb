@@ -2,6 +2,7 @@
 
 require "cases/helper"
 require "models/customer"
+require "models/composed_of_store_user"
 
 class AggregationsTest < ActiveRecord::TestCase
   fixtures :customers
@@ -165,6 +166,17 @@ class AggregationsTest < ActiveRecord::TestCase
     customers(:barney).save
 
     assert_equal "Lively Street", customers(:barney).address_street
+  end
+
+  def test_composed_of_with_store_accessors
+    user = ::ComposedOfStoreUser.new(currency: "USD", amount: 100.50)
+    expected_money = ::ComposedOfStoreUser::Money.new("USD", 100.50)
+    assert_equal expected_money, user.money, "The composed object should equal the expected value object."
+    new_money = ::ComposedOfStoreUser::Money.new("EUR", 999.00)
+    user.money = new_money
+
+    assert_equal "EUR", user.currency
+    assert_equal 999.00, user.amount
   end
 end
 
