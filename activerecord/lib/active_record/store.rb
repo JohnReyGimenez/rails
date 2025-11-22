@@ -102,6 +102,31 @@ module ActiveRecord
       end
     end
 
+    module StoreAttributeRedirection
+      def read_attribute(attr_name, &block)
+        name = attr_name.to_s
+
+        if self.class.stored_attributes.values.flatten.include?(name.to_sym)
+          store_column = self.class.stored_attributes.find { |k, v| v.include?(name.to_sym) }.first
+
+          return read_store_attribute(store_column, name.to_sym)
+        end
+
+        super
+      end
+
+      def write_attribute(attr_name, value)
+        name = attr_name.to_s
+
+        if self.class.stored_attributes.values.flatten.include?(name.to_sym)
+          store_column = self.class.stored_attributes.find { |k, v| v.include?(name.to_sym) }.first
+          return write_store_attribute(store_column, name.to_sym, value)
+        end
+
+        super
+      end
+    end
+
     module ClassMethods
       def store(store_attribute, options = {})
         coder = build_column_serializer(store_attribute, options[:coder], Object, options[:yaml])
@@ -111,6 +136,10 @@ module ActiveRecord
 
       def store_accessor(store_attribute, *keys, prefix: nil, suffix: nil)
         keys = keys.flatten
+
+        unless self < StoreAttributeRedirection
+          prepend StoreAttributeRedirection
+        end
 
         accessor_prefix =
           case prefix
