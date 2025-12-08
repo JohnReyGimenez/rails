@@ -247,12 +247,22 @@ module ActiveRecord
         private
           def reader_method(name, class_name, mapping, allow_nil, constructor)
             define_method(name) do
-              if @aggregation_cache[name].nil? && (!allow_nil || mapping.any? { |key, _| !read_attribute(key).nil? })
-                attrs = mapping.collect { |key, _| read_attribute(key) }
-                object = constructor.respond_to?(:call) ?
-                  constructor.call(*attrs) :
-                  class_name.constantize.send(constructor, *attrs)
-                @aggregation_cache[name] = object.freeze
+              if @aggregation_cache[name].nil?
+                attrs = mapping.collect do |key, _|
+                  stored_keys = self.class.respond_to?(:stored_attributes) ? self.class.stored_attributes.values.flatten : []
+                  if stored_keys.include?(key.to_sym)
+                    public_send(key)
+                  else
+                    read_attribute(key)
+                  end
+                end
+
+                if !allow_nil || attrs.any? { |attr| !attr.nil? }
+                  object = constructor.respond_to?(:call) ?
+                    constructor.call(*attrs) :
+                    class_name.constantize.send(constructor, *attrs)
+                  @aggregation_cache[name] = object.freeze
+                end
               end
               @aggregation_cache[name]
             end
@@ -274,10 +284,25 @@ module ActiveRecord
               end
 
               if part.nil? && allow_nil
-                mapping.each { |key, _| write_attribute(key, nil) }
+                mapping.each do |key, _|
+                  stored_keys = self.class.respond_to?(:stored_attributes) ? self.class.stored_attributes.values.flatten : []
+                  if stored_keys.include?(key.to_sym)
+                    public_send("#{key}=", nil)
+                  else
+                    write_attribute(key, nil)
+                  end
+                end
                 @aggregation_cache[name] = nil
               else
-                mapping.each { |key, value| write_attribute(key, part.send(value)) }
+                mapping.each do |key, value|
+                  val = part.send(value)
+                  stored_keys = self.class.respond_to?(:stored_attributes) ? self.class.stored_attributes.values.flatten : []
+                  if stored_keys.include?(key.to_sym)
+                    public_send("#{key}=", val)
+                  else
+                    write_attribute(key, val)
+                  end
+                end
                 @aggregation_cache[name] = part.dup.freeze
               end
             end
